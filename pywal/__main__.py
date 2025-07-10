@@ -24,8 +24,6 @@ from . import sequences
 from . import theme
 from . import util
 from . import wallpaper
-from . import donation
-from . import eastereggs
 
 
 show_colorama_warning = False
@@ -377,8 +375,6 @@ def main():
 
     parse_args_exit(parser)
     parse_args(parser)
-    donation.donation_message()
-    eastereggs.eemsg()
 
 
 if __name__ == "__main__":
