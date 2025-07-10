@@ -9,6 +9,7 @@ import shutil
 
 from . import util
 from .settings import CACHE_DIR, CONF_DIR, MODULE_DIR
+from . import colors as pywal_colors
 
 
 class ExportFile:
@@ -155,20 +156,54 @@ def generate_color_images(colors, destdir):
             pass
 
 
+def load_wal_config():
+    """Load wal config from ~/.config/wal/config.json, return dict."""
+    config_path = os.path.expanduser("~/.config/wal/config.json")
+    if os.path.isfile(config_path):
+        try:
+            return util.read_file_json(config_path)
+        except Exception:
+            return {}
+    return {}
+
+
 def every(colors, output_dir=CACHE_DIR):
-    """Export all template files."""
+    """Export all template files with forceDark/forceLight support."""
     join = os.path.join  # Minor optimization.
     generate_color_images(colors, output_dir)
-    colors = flatten_colors(colors)
+    colors_flat = flatten_colors(colors)
     template_dir = join(MODULE_DIR, "templates")
     template_dir_user = join(CONF_DIR, "templates")
     util.create_dir(template_dir_user)
+
+    config = load_wal_config()
+    force_dark = set(config.get("forceDark", []))
+    force_light = set(config.get("forceLight", []))
 
     logging.info("Reading system templates from: %s", template_dir)
     logging.info("Reading user templates from: %s", template_dir_user)
     for file in [*walk(template_dir), *walk(template_dir_user)]:
         if file.name != ".DS_Store" and not file.name.endswith(".swp"):
-            template(colors, file.path, join(output_dir, file.relative_path))
+
+            name = file.name
+            if name.startswith("colors-"):
+                name = name[len("colors-") :]
+            name = name.split(".")[0]
+            if name in force_dark or name in force_light:
+                wallpaper = colors.get("wallpaper")
+                backend = None
+                if hasattr(colors, "get"):
+                    backend = colors.get("backend", "wal")
+                if name in force_dark:
+                    logging.info(f"Force dark for template: {name}")
+                    forced_colors = pywal_colors.get(wallpaper, light=False, backend=backend)
+                else:
+                    logging.info(f"Force light for template: {name}")
+                    forced_colors = pywal_colors.get(wallpaper, light=True, backend=backend)
+                forced_colors_flat = flatten_colors(forced_colors)
+                template(forced_colors_flat, file.path, join(output_dir, file.relative_path))
+            else:
+                template(colors_flat, file.path, join(output_dir, file.relative_path))
 
     logging.info("Exported all files.")
     logging.info("Exported all user files to %s", output_dir)
